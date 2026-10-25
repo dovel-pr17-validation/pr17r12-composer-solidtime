@@ -1,0 +1,173 @@
+import { defineStore } from 'pinia';
+import { type Component } from 'vue';
+import { getCurrentRole, getCurrentUser } from '@/utils/useUser';
+import { useProjectsQuery } from '@/utils/useProjectsQuery';
+import { useMembersQuery } from '@/utils/useMembersQuery';
+import { useTasksQuery } from '@/utils/useTasksQuery';
+import { useClientsQuery } from '@/utils/useClientsQuery';
+import { useTagsQuery } from '@/utils/useTagsQuery';
+import { CheckCircleIcon, UserCircleIcon, UserGroupIcon } from '@heroicons/vue/20/solid';
+import {
+    CalendarDaysIcon,
+    CalendarIcon,
+    DocumentTextIcon,
+    FolderIcon,
+} from '@heroicons/vue/16/solid';
+import { Coffee } from '@lucide/vue';
+import BillableIcon from '@/packages/ui/src/Icons/BillableIcon.vue';
+import {
+    type DateFormat,
+    formatDate,
+    formatMonth,
+    formatWeekRange,
+} from '@/packages/ui/src/utils/time';
+
+export type GroupingOption =
+    | 'project'
+    | 'task'
+    | 'user'
+    | 'billable'
+    | 'client'
+    | 'description'
+    | 'tag'
+    | 'type'
+    | 'day'
+    | 'week'
+    | 'month'
+    | 'year';
+
+export const useReportingStore = defineStore('reporting', () => {
+    // Cache query composables to avoid creating new subscriptions on every call
+    const { projects } = useProjectsQuery();
+    const { members } = useMembersQuery();
+    const { tasks } = useTasksQuery();
+    const { clients } = useClientsQuery();
+    const { tags } = useTagsQuery();
+
+    const emptyPlaceholder = {
+        user: 'No User',
+        project: 'No Project',
+        task: 'No Task',
+        billable: 'Non-Billable',
+        client: 'No Client',
+        description: 'No Description',
+        tag: 'No Tag',
+        type: 'Work time',
+    } as Record<string, string>;
+
+    function getNameForReportingRowEntry(
+        key: string | null,
+        type: string | null,
+        dateFormat?: DateFormat
+    ) {
+        if (type === null) {
+            return null;
+        }
+        if (key === null) {
+            return emptyPlaceholder[type as keyof typeof emptyPlaceholder];
+        }
+
+        if (type === 'project') {
+            return projects.value.find((project) => project.id === key)?.name;
+        }
+        if (type === 'user') {
+            if (getCurrentRole() === 'employee') {
+                return getCurrentUser().name;
+            }
+            return members.value.find((member) => member.user_id === key)?.name;
+        }
+        if (type === 'task') {
+            return tasks.value.find((task) => task.id === key)?.name;
+        }
+        if (type === 'client') {
+            return clients.value.find((client) => client.id === key)?.name;
+        }
+        if (type === 'tag') {
+            return tags.value.find((tag) => tag.id === key)?.name;
+        }
+        if (type === 'billable') {
+            if (key === '0') {
+                return 'Non-Billable';
+            } else {
+                return 'Billable';
+            }
+        }
+        if (type === 'type') {
+            return key === 'break' ? 'Break' : 'Work time';
+        }
+        if (type === 'day') {
+            return formatDate(key, dateFormat);
+        }
+        if (type === 'week') {
+            return formatWeekRange(key, dateFormat);
+        }
+        if (type === 'month') {
+            return formatMonth(key);
+        }
+        // A `year` key is already a bare year, so it falls through unchanged.
+        return key;
+    }
+
+    const groupByOptions: {
+        label: string;
+        value: GroupingOption;
+        icon: Component;
+    }[] = [
+        {
+            label: 'Members',
+            value: 'user',
+            icon: UserGroupIcon,
+        },
+        {
+            label: 'Projects',
+            value: 'project',
+            icon: FolderIcon,
+        },
+        {
+            label: 'Tasks',
+            value: 'task',
+            icon: CheckCircleIcon,
+        },
+        {
+            label: 'Clients',
+            value: 'client',
+            icon: UserCircleIcon,
+        },
+        {
+            label: 'Billable',
+            value: 'billable',
+            icon: BillableIcon,
+        },
+        {
+            label: 'Type',
+            value: 'type',
+            icon: Coffee,
+        },
+        {
+            label: 'Description',
+            value: 'description',
+            icon: DocumentTextIcon,
+        },
+        {
+            label: 'Tags',
+            value: 'tag',
+            icon: DocumentTextIcon,
+        },
+        {
+            label: 'Date',
+            value: 'day',
+            icon: CalendarIcon,
+        },
+        {
+            label: 'Week',
+            value: 'week',
+            icon: CalendarDaysIcon,
+        },
+    ];
+
+    return {
+        getNameForReportingRowEntry,
+        groupByOptions,
+        emptyPlaceholder,
+    };
+});
